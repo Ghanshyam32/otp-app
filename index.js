@@ -8,12 +8,20 @@ const port = process.env.PORT || 3000;
 // Parse JSON bodies
 app.use(express.json());
 
-// Initialize Firebase Admin (ensure you have the proper credentials configured)
+/**
+ * Initialize Firebase Admin explicitly with a service account.
+ *
+ * For Railway, you can store your service account JSON as an environment variable.
+ * For example, set an environment variable FIREBASE_SERVICE_ACCOUNT containing your JSON string,
+ * and FIREBASE_PROJECT_ID with your project ID.
+ */
 if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-    // Optionally, add your Firestore databaseURL:
-    // databaseURL: "https://your-project-id.firebaseio.com"
+    credential: admin.credential.cert(serviceAccount),
+    projectId: process.env.FIREBASE_PROJECT_ID, // Ensure this is set in Railway
+    // Optionally add databaseURL if needed:
+    // databaseURL: "https://<your-project-id>.firebaseio.com"
   });
 }
 
@@ -49,7 +57,7 @@ function verifyOtp(email, otp) {
 /**
  * Endpoint: /sendOtp
  * - Expects a JSON body: { "email": "user@example.com" }
- * - Generates a 6-digit OTP, stores it, sends it via SES, and returns it (for testing).
+ * - Generates a 6-digit OTP, stores it, sends it via AWS SES, and returns it (for testing).
  */
 app.post("/sendOtp", async (req, res) => {
   try {
@@ -84,7 +92,7 @@ app.post("/sendOtp", async (req, res) => {
 
     // Send email via SES
     await ses.sendEmail(params).promise();
-    // For testing, return the OTP in the response (remove in production)
+    // For demonstration, return the OTP in the response (remove in production)
     return res.status(200).json({ success: true, otp: otpCode });
   } catch (error) {
     console.error("Error sending email via SES:", error);
@@ -123,11 +131,18 @@ app.post("/verifyOtpAndGenerateToken", async (req, res) => {
         .json({ success: false, message: "Invalid or expired OTP." });
     }
 
-    // Retrieve the user using Firebase Admin SDK.
-    const userRecord = await admin.auth().getUserByEmail(email);
-    // Generate a custom token.
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(email);
+    } catch (err) {
+      console.error("Error fetching user by email:", err);
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
+    }
+
     const customToken = await admin.auth().createCustomToken(userRecord.uid);
-    // Remove OTP record
+    // Remove OTP record after successful verification
     otpStore.delete(email);
     return res.status(200).json({ success: true, token: customToken });
   } catch (error) {
@@ -145,12 +160,10 @@ app.post("/resetPassword", async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
     if (!email || !otp || !newPassword) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Email, OTP, and newPassword are required.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Email, OTP, and newPassword are required.",
+      });
     }
     if (!verifyOtp(email, otp)) {
       return res
