@@ -10,17 +10,12 @@ app.use(express.json());
 
 /**
  * Initialize Firebase Admin explicitly with a service account.
- *
- * For Railway, you can store your service account JSON as an environment variable.
- * For example, set an environment variable FIREBASE_SERVICE_ACCOUNT containing your JSON string,
- * and FIREBASE_PROJECT_ID with your project ID.
  */
 if (!admin.apps.length) {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    projectId: process.env.FIREBASE_PROJECT_ID, // Ensure this is set in Railway
-    // Optionally add databaseURL if needed:
+    projectId: process.env.FIREBASE_PROJECT_ID,
     // databaseURL: "https://<your-project-id>.firebaseio.com"
   });
 }
@@ -77,14 +72,40 @@ app.post("/sendOtp", async (req, res) => {
       Source: "support@jivahealth.in", // Must be verified in AWS SES
       Destination: { ToAddresses: [email] },
       Message: {
-        Subject: { Data: "Your Secure Login OTP" },
+        Subject: { Data: "Your Secure Login OTP - Jiva Health" },
         Body: {
           Html: {
-            Data: `<p>Your OTP is: <strong>${otpCode}</strong></p>
-                   <p>Do not share this OTP with anyone.</p>`,
+            Data: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+</head>
+<body style="font-family: Arial, sans-serif; color: #000;">
+  <h3>Your Secure Login OTP</h3>
+  <p>Dear User,</p>
+  <p>Your One-Time Password (OTP) for secure login is:</p>
+  <p style="font-size: 24px; font-weight: bold;">${otpCode}</p>
+  <p>This OTP is valid for 5 minutes. Do not share it with anyone.</p>
+  <p>If you didn't request this, please ignore this email.</p>
+  <br/>
+  <p>Best Regards,<br/>
+  Jiva Health Support Team</p>
+</body>
+</html>
+            `,
           },
           Text: {
-            Data: `Your OTP is: ${otpCode}. Do not share this OTP with anyone.`,
+            Data: `Dear User,
+
+Your One-Time Password (OTP) for secure login is: ${otpCode}
+
+This OTP is valid for 5 minutes. Do not share it with anyone.
+
+If you didn't request this, please ignore this email.
+
+Best Regards,
+Jiva Health Support Team`,
           },
         },
       },
@@ -92,6 +113,7 @@ app.post("/sendOtp", async (req, res) => {
 
     // Send email via SES
     await ses.sendEmail(params).promise();
+
     // For demonstration, return the OTP in the response (remove in production)
     return res.status(200).json({ success: true, otp: otpCode });
   } catch (error) {
@@ -115,12 +137,10 @@ app.post("/verifyOtpAndGenerateToken", async (req, res) => {
     }
     const record = otpStore.get(email);
     if (!record) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No OTP request found for this email.",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No OTP request found for this email.",
+      });
     }
     if (
       record.otp.toString() !== otp.toString() ||
