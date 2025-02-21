@@ -160,7 +160,7 @@ app.post("/verifyOtpAndGenerateToken", async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found." });
     }
-
+    console.log("Received email:", JSON.stringify(email));
     const customToken = await admin.auth().createCustomToken(userRecord.uid);
     // Remove OTP record after successful verification
     otpStore.delete(email);
