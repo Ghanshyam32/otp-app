@@ -130,6 +130,7 @@ Jiva Health Support Team`,
 app.post("/verifyOtpAndGenerateToken", async (req, res) => {
   try {
     const { email, otp } = req.body;
+    console.log("Received email:", JSON.stringify(email));
     if (!email || !otp) {
       return res
         .status(400)
@@ -160,7 +161,6 @@ app.post("/verifyOtpAndGenerateToken", async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found." });
     }
-    console.log("Received email:", JSON.stringify(email));
     const customToken = await admin.auth().createCustomToken(userRecord.uid);
     // Remove OTP record after successful verification
     otpStore.delete(email);
