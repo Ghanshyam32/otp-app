@@ -200,6 +200,17 @@ app.post("/resetPassword", async (req, res) => {
   }
 });
 
+app.get("/testListUsers", async (req, res) => {
+  try {
+    const listUsersResult = await admin.auth().listUsers();
+    const allEmails = listUsersResult.users.map((u) => u.email);
+    return res.json({ emails: allEmails });
+  } catch (error) {
+    console.error("Error listing users:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // Simple endpoint to verify that the backend is running.
 app.get("/", (req, res) => {
   res.send("OTP Backend is running.");
