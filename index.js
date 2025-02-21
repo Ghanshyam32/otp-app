@@ -153,7 +153,7 @@ app.post("/verifyOtpAndGenerateToken", async (req, res) => {
 
     let userRecord;
     try {
-      userRecord = await admin.auth().getUserByEmail(email);
+      const customToken = await admin.auth().createCustomToken(userRecord.uid);
     } catch (err) {
       console.error("Error fetching user by email:", err);
       return res
